@@ -1,0 +1,19 @@
+# Ignore Terraform local state files and sensitive variables
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# Ignore Java build outputs
+build/
+.gradle/
+*.jar
+*.war
+*.class
+
+# Ignore IDE specific files
+.idea/
+.vscode/
+*.iml
