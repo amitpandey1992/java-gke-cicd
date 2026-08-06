@@ -26,5 +26,5 @@ variable "artifact_repo_name" {
 variable "github_repo" {
   description = "GitHub repository in format owner/repo for Workload Identity Federation"
   type        = string
-  default     = "your-username/java-gke-cicd"
+  default     = "amitpandey1992/java-gke-cicd"
 }
