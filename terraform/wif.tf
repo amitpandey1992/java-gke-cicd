@@ -22,7 +22,7 @@ resource "google_project_iam_member" "gke_developer" {
 # Workload Identity Pool for GitHub Actions
 resource "google_iam_workload_identity_pool" "github_pool" {
   project                   = var.project_id
-  workload_identity_pool_id = "github-pool-v3"
+  workload_identity_pool_id = "github-pool-v4"
   display_name              = "GitHub Actions WIF Pool"
   description               = "Identity pool for GitHub Actions pipelines"
 }
