@@ -9,7 +9,10 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    defaults:
+      run:
+        shell: bash
 
     # Required permissions for Workload Identity Federation (OIDC)
     permissions:
