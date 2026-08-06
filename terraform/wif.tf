@@ -53,3 +53,15 @@ resource "google_service_account_iam_member" "github_wif_impersonation" {
   role               = "roles/iam.workloadIdentityUser"
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/${var.github_repo}"
 }
+
+# Fetch project metadata to get the project number dynamically
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+# Grant Artifact Registry Reader to the default Compute Engine service account used by GKE nodes
+resource "google_project_iam_member" "gke_node_registry_reader" {
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
