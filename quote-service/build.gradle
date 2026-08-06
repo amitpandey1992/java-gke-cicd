@@ -31,11 +31,11 @@ jib {
         image = 'eclipse-temurin:17-jre-alpine'
     }
     to {
-        image = 'demo-java-app'
+        image = 'quote-service'
         tags = ['latest', '1.0.0']
     }
     container {
-        mainClass = 'com.example.demo.DemoApplication'
+        mainClass = 'com.example.quote.QuoteApplication'
         ports = ['8080']
         creationTime = 'USE_CURRENT_TIMESTAMP'
     }
