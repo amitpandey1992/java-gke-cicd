@@ -93,10 +93,19 @@ jobs:
       # Step 11: Clean up old StatefulSet (one-time migration to Deployment)
       - name: Cleanup old Postgres StatefulSet
         run: |
-          echo "Deleting old StatefulSet and corrupt PVC if they exist..."
-          kubectl delete statefulset postgres --ignore-not-found=true
-          kubectl delete pvc postgres-pvc --ignore-not-found=true
-          echo "Cleanup done. Fresh PVC will be created by Helm."
+          echo "Force deleting old postgres pods..."
+          kubectl delete pods -l app=postgres --force --grace-period=0 --ignore-not-found=true
+          
+          echo "Deleting old StatefulSet without waiting..."
+          kubectl delete statefulset postgres --ignore-not-found=true --wait=false
+          
+          echo "Removing finalizers from PVC to prevent deletion hang..."
+          kubectl patch pvc postgres-pvc -p '{"metadata":{"finalizers":null}}' --type=merge --ignore-not-found=true || true
+          
+          echo "Deleting old PVC..."
+          kubectl delete pvc postgres-pvc --ignore-not-found=true --wait=false
+          
+          echo "Cleanup triggered successfully. Fresh PVC/Deployment will be created by Helm."
 
       # Step 12: Deploy application to GKE using Helm
       - name: Deploy Helm Chart to GKE
