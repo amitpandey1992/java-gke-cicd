@@ -12,12 +12,39 @@ spec:
       labels:
         app: quote-service
     spec:
+      initContainers:
+        - name: newrelic-agent-download
+          image: busybox:1.36
+          command: ["sh", "-c", "wget -O /agent/newrelic.jar https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic.jar"]
+          volumeMounts:
+            - name: newrelic-agent-volume
+              mountPath: /agent
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
       containers:
         - name: quote-service
           image: "{{ .Values.quoteService.image.repository }}:{{ .Values.quoteService.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-javaagent:/newrelic/newrelic.jar"
+            - name: NEW_RELIC_APP_NAME
+              value: "quote-service"
+            - name: NEW_RELIC_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: newrelic-secrets
+                  key: license-key
+          volumeMounts:
+            - name: newrelic-agent-volume
+              mountPath: /newrelic
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
@@ -30,6 +57,9 @@ spec:
               port: 8080
             initialDelaySeconds: 20
             periodSeconds: 5
+      volumes:
+        - name: newrelic-agent-volume
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

@@ -121,4 +121,25 @@ jobs:
             --set taskService.image.tag=${{ github.sha }} \
             --set quoteService.image.repository=${QUOTE_REPO} \
             --set quoteService.image.tag=${{ github.sha }} \
+            --set newrelic.licenseKey="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
             --wait --timeout 5m
+
+      # Step 13: Deploy New Relic Infrastructure Monitoring Bundle (EU Region)
+      - name: Deploy New Relic Monitoring Bundle
+        run: |
+          if [ -n "${{ secrets.NEW_RELIC_LICENSE_KEY }}" ]; then
+            echo "Installing New Relic Infrastructure Agent..."
+            helm repo add newrelic https://helm-charts.newrelic.com
+            helm repo update
+            helm upgrade --install newrelic-bundle newrelic/nri-bundle \
+              --namespace newrelic --create-namespace \
+              --set global.licenseKey="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+              --set global.cluster="java-gke-cluster" \
+              --set global.region="EU" \
+              --set newrelic-infrastructure.enabled=true \
+              --set kube-state-metrics.enabled=true \
+              --set pixiesizing.enabled=false \
+              --wait --timeout 5m
+          else
+            echo "NEW_RELIC_LICENSE_KEY secret is not set, skipping infrastructure monitoring deployment."
+          fi

@@ -18,3 +18,7 @@ quoteService:
   image:
     repository: "us-central1-docker.pkg.dev/project-616fef18-15b8-4d6c-8a2/java-app-repo/quote-service"
     tag: "latest"
+
+newrelic:
+  licenseKey: ""
+
