@@ -48,10 +48,10 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      # Step 5: Configure Docker Authentication for GCP Artifact Registry
-      - name: Configure Docker CLI for Artifact Registry
+      # Step 5: Log in to Google Artifact Registry
+      - name: Log in to Google Artifact Registry
         run: |
-          gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+          echo "${{ steps.auth.outputs.access_token }}" | docker login -u oauth2accesstoken --password-stdin ${{ env.GCP_REGION }}-docker.pkg.dev
 
       # Step 6: Build & Push task-service using Gradle Jib
       - name: Build and Push Task Service with Jib
