@@ -90,7 +90,15 @@ jobs:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GCP_REGION }}
 
-      # Step 11: Deploy application to GKE using Helm
+      # Step 11: Clean up old StatefulSet (one-time migration to Deployment)
+      - name: Cleanup old Postgres StatefulSet
+        run: |
+          echo "Deleting old StatefulSet and corrupt PVC if they exist..."
+          kubectl delete statefulset postgres --ignore-not-found=true
+          kubectl delete pvc postgres-pvc --ignore-not-found=true
+          echo "Cleanup done. Fresh PVC will be created by Helm."
+
+      # Step 12: Deploy application to GKE using Helm
       - name: Deploy Helm Chart to GKE
         run: |
           FE_REPO="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/frontend"
