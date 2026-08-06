@@ -9,13 +9,3 @@ resource "google_container_cluster" "primary" {
   # Deletion protection disabled for dev/demo purposes
   deletion_protection = false
 }
-
-output "gke_cluster_name" {
-  description = "The name of the GKE Cluster"
-  value       = google_container_cluster.primary.name
-}
-
-output "gke_cluster_location" {
-  description = "The region of the GKE Cluster"
-  value       = google_container_cluster.primary.location
-}
