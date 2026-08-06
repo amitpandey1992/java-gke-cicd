@@ -1,13 +1,8 @@
-variable "billing_account_id" {
-  description = "Your GCP Billing Account ID (from GCP Console -> Billing)"
+# Simple Project ID variable for direct provisioning
+variable "project_id" {
+  description = "Your active GCP Project ID"
   type        = string
-  sensitive   = true # Prevents Terraform from logging this value in CLI output
-}
-
-variable "new_project_id" {
-  description = "The unique GCP Project ID for the new project to be created"
-  type        = string
-  default     = "java-gke-demo-proj-2026"
+  default     = "project-616fef18-15b8-4d6c-8a2"
 }
 
 variable "region" {

@@ -1,5 +1,5 @@
 resource "google_container_cluster" "primary" {
-  project  = google_project.demo_project.project_id
+  project  = var.project_id
   name     = var.cluster_name
   location = var.region
 
@@ -8,9 +8,14 @@ resource "google_container_cluster" "primary" {
 
   # Deletion protection disabled for dev/demo purposes
   deletion_protection = false
-
-  depends_on = [
-    google_project_service.gke_api
-  ]
 }
 
+output "gke_cluster_name" {
+  description = "The name of the GKE Cluster"
+  value       = google_container_cluster.primary.name
+}
+
+output "gke_cluster_location" {
+  description = "The region of the GKE Cluster"
+  value       = google_container_cluster.primary.location
+}
