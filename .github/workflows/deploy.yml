@@ -37,8 +37,10 @@ jobs:
 
       # Step 3: Authenticate to GCP using Workload Identity Federation (Keyless Auth)
       - name: Authenticate to Google Cloud (OIDC)
+        id: auth
         uses: google-github-actions/auth@v2
         with:
+          token_format: 'access_token'
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
@@ -59,7 +61,9 @@ jobs:
           IMAGE_URI="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/task-service"
           ./gradlew jib \
             -Djib.to.image=${IMAGE_URI}:${{ github.sha }} \
-            -Djib.to.tags=latest
+            -Djib.to.tags=latest \
+            -Djib.to.auth.username=oauth2accesstoken \
+            -Djib.to.auth.password=${{ steps.auth.outputs.access_token }}
 
       # Step 7: Build & Push quote-service using Gradle Jib
       - name: Build and Push Quote Service with Jib
@@ -69,7 +73,9 @@ jobs:
           IMAGE_URI="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/quote-service"
           ./gradlew jib \
             -Djib.to.image=${IMAGE_URI}:${{ github.sha }} \
-            -Djib.to.tags=latest
+            -Djib.to.tags=latest \
+            -Djib.to.auth.username=oauth2accesstoken \
+            -Djib.to.auth.password=${{ steps.auth.outputs.access_token }}
 
       # Step 8: Build & Push Nginx frontend using standard Docker Build
       - name: Build and Push Frontend Docker Image
