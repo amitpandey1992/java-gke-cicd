@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: [self-hosted, SAMRAT]
+    runs-on: self-hosted
     defaults:
       run:
         shell: bash
