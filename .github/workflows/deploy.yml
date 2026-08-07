@@ -5,10 +5,18 @@ on:
     branches:
       - main
       - master
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
   pull_request:
     branches:
       - main
       - master
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
   workflow_dispatch:
 
 jobs:
