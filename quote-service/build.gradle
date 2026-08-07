@@ -38,5 +38,4 @@ jib {
         ports = ['8080']
         creationTime = 'USE_CURRENT_TIMESTAMP'
     }
-    allowInsecureRegistries = true
 }

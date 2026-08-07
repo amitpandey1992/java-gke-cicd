@@ -1,4 +1,4 @@
-name: Build and Deploy Microservices to GKE (via Artifactory)
+name: Build and Deploy Microservices to GKE (via Artifactory HTTPS)
 
 on:
   push:
@@ -19,9 +19,9 @@ jobs:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
       GCP_REGION: us-central1
       GKE_CLUSTER: java-gke-cluster
-      ARTIFACTORY_HOST: "137.23.52.82:8082"
-      ARTIFACTORY_URL: "http://137.23.52.82:8082/artifactory"
-      DOCKER_REPO: "137.23.52.82:8082/docker-local"
+      ARTIFACTORY_HOST: "my-jfrog-artifactory.duckdns.org"
+      ARTIFACTORY_URL: "https://my-jfrog-artifactory.duckdns.org/artifactory"
+      DOCKER_REPO: "my-jfrog-artifactory.duckdns.org/docker-local"
 
     steps:
       # Step 1: Checkout Code
@@ -73,25 +73,17 @@ jobs:
           cp task-service/src/main/jib/newrelic/newrelic.jar quote-service/src/main/jib/newrelic/newrelic.jar
           ls -lh task-service/src/main/jib/newrelic/newrelic.jar
 
-      # Step 5: Configure Docker daemon for insecure HTTP Artifactory registry & Log in
-      - name: Configure Insecure Docker Registry & Log in
+      # Step 5: Log in to Artifactory Docker Registry over HTTPS
+      - name: Log in to Artifactory Docker Registry
         run: |
-          sudo mkdir -p /etc/docker
-          echo '{"insecure-registries": ["${{ env.ARTIFACTORY_HOST }}", "137.23.52.82:8081"]}' | sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
           echo "${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}" | docker login ${{ env.ARTIFACTORY_HOST }} -u ${{ secrets.ARTIFACTORY_USER }} --password-stdin
 
       # Step 6: Build & Push task-service to Artifactory via Gradle Jib
       - name: Build and Push Task Service to Artifactory with Jib
-        env:
-          GRADLE_OPTS: "-Djib.sendCredentialsOverHttp=true -Djib.allowInsecureRegistries=true"
         run: |
           cd task-service
           chmod +x gradlew || true
           ./gradlew jib \
-            -DsendCredentialsOverHttp=true \
-            -Djib.allowInsecureRegistries=true \
-            -Djib.sendCredentialsOverHttp=true \
             -Djib.to.image=${{ env.DOCKER_REPO }}/task-service:${{ github.sha }} \
             -Djib.to.tags=latest \
             -Djib.to.auth.username=${{ secrets.ARTIFACTORY_USER }} \
@@ -99,15 +91,10 @@ jobs:
 
       # Step 7: Build & Push quote-service to Artifactory via Gradle Jib
       - name: Build and Push Quote Service to Artifactory with Jib
-        env:
-          GRADLE_OPTS: "-Djib.sendCredentialsOverHttp=true -Djib.allowInsecureRegistries=true"
         run: |
           cd quote-service
           chmod +x gradlew || true
           ./gradlew jib \
-            -DsendCredentialsOverHttp=true \
-            -Djib.allowInsecureRegistries=true \
-            -Djib.sendCredentialsOverHttp=true \
             -Djib.to.image=${{ env.DOCKER_REPO }}/quote-service:${{ github.sha }} \
             -Djib.to.tags=latest \
             -Djib.to.auth.username=${{ secrets.ARTIFACTORY_USER }} \
@@ -143,7 +130,7 @@ jobs:
       # Step 12: Deploy application to GKE using Helm (with Artifactory imagePullSecrets)
       - name: Deploy Helm Chart to GKE from Artifactory Images
         run: |
-          DOCKER_CONFIG_JSON=$(echo -n "{\"auths\":{\"${{ env.ARTIFACTORY_HOST }}\":{\"username\":\"${{ secrets.ARTIFACTORY_USER }}\",\"password\":\"${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}\"}}}" | base64 -w 0)
+          DOCKER_CONFIG_JSON=$(echo -n "{\"auths\":{\"https://${{ env.ARTIFACTORY_HOST }}\":{\"username\":\"${{ secrets.ARTIFACTORY_USER }}\",\"password\":\"${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}\"},\"${{ env.ARTIFACTORY_HOST }}\":{\"username\":\"${{ secrets.ARTIFACTORY_USER }}\",\"password\":\"${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}\"}}}" | base64 -w 0)
           
           FE_REPO="${{ env.DOCKER_REPO }}/frontend"
           TASK_REPO="${{ env.DOCKER_REPO }}/task-service"

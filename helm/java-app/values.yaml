@@ -8,19 +8,19 @@ artifactory:
 frontend:
   replicaCount: 2
   image:
-    repository: "137.23.52.82:8082/docker-local/frontend"
+    repository: "my-jfrog-artifactory.duckdns.org/docker-local/frontend"
     tag: "latest"
 
 taskService:
   replicaCount: 2
   image:
-    repository: "137.23.52.82:8082/docker-local/task-service"
+    repository: "my-jfrog-artifactory.duckdns.org/docker-local/task-service"
     tag: "latest"
 
 quoteService:
   replicaCount: 1
   image:
-    repository: "137.23.52.82:8082/docker-local/quote-service"
+    repository: "my-jfrog-artifactory.duckdns.org/docker-local/quote-service"
     tag: "latest"
 
 newrelic:
