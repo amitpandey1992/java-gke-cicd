@@ -51,6 +51,7 @@ jobs:
       # Step 3: Run Unit Tests for Microservices (CI Verification on PR and Push)
       - name: Run Unit Tests for Microservices
         run: |
+          chmod +x task-service/gradlew quote-service/gradlew || true
           cd task-service && ./gradlew test || true && cd ..
           cd quote-service && ./gradlew test || true && cd ..
 
