@@ -88,6 +88,7 @@ jobs:
           chmod +x gradlew || true
           ./gradlew jib \
             -Djib.allowInsecureRegistries=true \
+            -Djib.sendCredentialsOverHttp=true \
             -Djib.to.image=${{ env.DOCKER_REPO }}/task-service:${{ github.sha }} \
             -Djib.to.tags=latest \
             -Djib.to.auth.username=${{ secrets.ARTIFACTORY_USER }} \
@@ -100,6 +101,7 @@ jobs:
           chmod +x gradlew || true
           ./gradlew jib \
             -Djib.allowInsecureRegistries=true \
+            -Djib.sendCredentialsOverHttp=true \
             -Djib.to.image=${{ env.DOCKER_REPO }}/quote-service:${{ github.sha }} \
             -Djib.to.tags=latest \
             -Djib.to.auth.username=${{ secrets.ARTIFACTORY_USER }} \
