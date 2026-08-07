@@ -13,19 +13,18 @@ spec:
         app: task-service
     spec:
       initContainers:
-        - name: newrelic-agent-download
-          image: busybox:1.36
-          command: ["sh", "-c", "wget -O /agent/newrelic.jar https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic.jar"]
+        - name: newrelic-agent-init
+          image: newrelic/java-agent-init:latest
           volumeMounts:
             - name: newrelic-agent-volume
-              mountPath: /agent
+              mountPath: /newrelic
           resources:
             requests:
               cpu: "50m"
-              memory: "32Mi"
+              memory: "64Mi"
             limits:
               cpu: "100m"
-              memory: "64Mi"
+              memory: "128Mi"
       containers:
         - name: task-service
           image: "{{ .Values.taskService.image.repository }}:{{ .Values.taskService.image.tag | default .Chart.AppVersion }}"
