@@ -48,6 +48,12 @@ jobs:
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
 
+      # Step 4: Add Windows tool paths so Git Bash can find docker, kubectl, helm
+      - name: Add Windows tool paths for Git Bash
+        run: |
+          echo "C:/Program Files/Docker/Docker/resources/bin" >> $GITHUB_PATH
+          echo "C:/Program Files/Docker/resources/bin" >> $GITHUB_PATH
+
       # Step 5: Log in to Google Artifact Registry
       - name: Log in to Google Artifact Registry
         run: |
