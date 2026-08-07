@@ -24,6 +24,15 @@ spec:
                 secretKeyRef:
                   name: postgres-secrets
                   key: postgres-password
+            - name: JAVA_TOOL_OPTIONS
+              value: "-javaagent:/newrelic/newrelic.jar"
+            - name: NEW_RELIC_APP_NAME
+              value: "task-service"
+            - name: NEW_RELIC_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: newrelic-secrets
+                  key: license-key
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness

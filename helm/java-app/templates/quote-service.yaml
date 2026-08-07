@@ -19,6 +19,15 @@ spec:
           ports:
             - containerPort: 8080
           env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-javaagent:/newrelic/newrelic.jar"
+            - name: NEW_RELIC_APP_NAME
+              value: "quote-service"
+            - name: NEW_RELIC_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: newrelic-secrets
+                  key: license-key
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness

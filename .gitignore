@@ -10,6 +10,7 @@
 build/
 .gradle/
 *.jar
+!**/newrelic.jar
 !**/gradle-wrapper.jar
 *.war
 *.class
