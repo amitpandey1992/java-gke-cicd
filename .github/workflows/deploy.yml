@@ -73,9 +73,12 @@ jobs:
           cp task-service/src/main/jib/newrelic/newrelic.jar quote-service/src/main/jib/newrelic/newrelic.jar
           ls -lh task-service/src/main/jib/newrelic/newrelic.jar
 
-      # Step 5: Log in to Artifactory Docker Registry
-      - name: Log in to Artifactory Docker Registry
+      # Step 5: Configure Docker daemon for insecure HTTP Artifactory registry & Log in
+      - name: Configure Insecure Docker Registry & Log in
         run: |
+          sudo mkdir -p /etc/docker
+          echo '{"insecure-registries": ["${{ env.ARTIFACTORY_HOST }}", "137.23.52.82:8081"]}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
           echo "${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}" | docker login ${{ env.ARTIFACTORY_HOST }} -u ${{ secrets.ARTIFACTORY_USER }} --password-stdin
 
       # Step 6: Build & Push task-service to Artifactory via Gradle Jib
@@ -84,6 +87,7 @@ jobs:
           cd task-service
           chmod +x gradlew || true
           ./gradlew jib \
+            -Djib.allowInsecureRegistries=true \
             -Djib.to.image=${{ env.DOCKER_REPO }}/task-service:${{ github.sha }} \
             -Djib.to.tags=latest \
             -Djib.to.auth.username=${{ secrets.ARTIFACTORY_USER }} \
@@ -95,6 +99,7 @@ jobs:
           cd quote-service
           chmod +x gradlew || true
           ./gradlew jib \
+            -Djib.allowInsecureRegistries=true \
             -Djib.to.image=${{ env.DOCKER_REPO }}/quote-service:${{ github.sha }} \
             -Djib.to.tags=latest \
             -Djib.to.auth.username=${{ secrets.ARTIFACTORY_USER }} \
