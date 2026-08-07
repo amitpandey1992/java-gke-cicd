@@ -12,19 +12,6 @@ spec:
       labels:
         app: task-service
     spec:
-      initContainers:
-        - name: newrelic-agent-init
-          image: newrelic/java-agent-init:latest
-          volumeMounts:
-            - name: newrelic-agent-volume
-              mountPath: /newrelic
-          resources:
-            requests:
-              cpu: "50m"
-              memory: "64Mi"
-            limits:
-              cpu: "100m"
-              memory: "128Mi"
       containers:
         - name: task-service
           image: "{{ .Values.taskService.image.repository }}:{{ .Values.taskService.image.tag | default .Chart.AppVersion }}"
@@ -37,18 +24,6 @@ spec:
                 secretKeyRef:
                   name: postgres-secrets
                   key: postgres-password
-            - name: JAVA_TOOL_OPTIONS
-              value: "-javaagent:/newrelic/newrelic.jar"
-            - name: NEW_RELIC_APP_NAME
-              value: "task-service"
-            - name: NEW_RELIC_LICENSE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: newrelic-secrets
-                  key: license-key
-          volumeMounts:
-            - name: newrelic-agent-volume
-              mountPath: /newrelic
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
@@ -61,9 +36,6 @@ spec:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 5
-      volumes:
-        - name: newrelic-agent-volume
-          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
