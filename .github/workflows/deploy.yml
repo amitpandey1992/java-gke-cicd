@@ -47,9 +47,6 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      # Step 4: Set up gcloud CLI
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
 
       # Step 5: Log in to Google Artifact Registry
       - name: Log in to Google Artifact Registry
@@ -88,9 +85,6 @@ jobs:
           docker push ${IMAGE_URI}:${{ github.sha }}
           docker push ${IMAGE_URI}:latest
 
-      # Step 9: Set up Helm CLI
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
 
       # Step 10: Get GKE Cluster Credentials
       - name: Get GKE Credentials
