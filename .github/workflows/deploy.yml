@@ -141,6 +141,7 @@ jobs:
             --set artifactory.dockerConfigJson="${DOCKER_CONFIG_JSON}" \
             --set frontend.image.repository=${FE_REPO} \
             --set frontend.image.tag=${{ github.sha }} \
+            --set frontend.loadBalancerIP="${{ secrets.FRONTEND_STATIC_IP }}" \
             --set taskService.image.repository=${TASK_REPO} \
             --set taskService.image.tag=${{ github.sha }} \
             --set quoteService.image.repository=${QUOTE_REPO} \

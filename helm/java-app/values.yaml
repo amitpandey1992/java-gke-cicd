@@ -7,6 +7,7 @@ artifactory:
 
 frontend:
   replicaCount: 2
+  loadBalancerIP: ""
   image:
     repository: "my-jfrog-artifactory.duckdns.org/docker-local/frontend"
     tag: "latest"

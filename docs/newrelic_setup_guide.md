@@ -1,60 +1,60 @@
 # New Relic Java APM Setup & Architecture Guide (Artifactory Edition)
 
-यह गाइड आपको विस्तार से समझाएगी कि हमने माइक्रोसर्विसेज (`task-service` और `quote-service`) के लिए **New Relic Java APM** का सेटअप **JFrog Artifactory** और **Jib Layering** का उपयोग करके कैसे किया।
+This guide provides a comprehensive overview of how **New Relic Java APM** monitoring was configured for the Java microservices (`task-service` and `quote-service`) using **JFrog Artifactory** dependency management and **Jib Container Layering**.
 
 ---
 
-## 1. कोर कांसेप्ट: Java Agent क्या है?
+## 1. Core Concept: What is the Java Agent?
 
-Java में किसी एप्लीकेशन को मॉनिटर करने के लिए New Relic एक **Java Agent (`newrelic.jar`)** का उपयोग करता है।
-* यह एजेंट एप्लीकेशन के चलने से पहले **JVM (Java Virtual Machine)** में लोड होता है।
-* इसके लिए JVM को एक विशेष फ्लैग दिया जाता है: `-javaagent:/newrelic/newrelic.jar`।
-* जब आपका कोड चलता है, तो यह एजेंट बैकग्राउंड में कोड के परफॉरमेंस (API response time, database query time, errors) को ट्रैक करता है और उसे न्यू रेलिक के क्लाउड सर्वर पर भेजता है।
+New Relic uses a **Java Agent (`newrelic.jar`)** to monitor JVM-based applications.
+* The agent is loaded into the **JVM (Java Virtual Machine)** at startup before application code executes.
+* It is activated by passing the JVM argument: `-javaagent:/newrelic/newrelic.jar`.
+* As your application handles requests, the agent automatically instruments bytecode to measure performance metrics (API response times, database queries, memory usage, and error rates) and sends telemetry directly to New Relic Cloud.
 
 ---
 
-## 2. आर्किटेक्चर इवोल्यूशन (Approach Evolution)
+## 2. Approach Evolution
 
-हमने न्यू रेलिक एजेंट को मैनेज करने के लिए 3 अलग-अलग अप्रोच आजमाईं:
+We evaluated 3 distinct approaches to deliver the New Relic Java Agent to GKE workloads:
 
 ```
-[अप्रोच A: रनटाइम डाउनलोड (फेल ❌)] ➔ [अप्रोच B: Git में Jar रखना (अमान्य ❌)] ➔ [अप्रोच C: Artifactory + Jib (सफल ✅)]
+[Approach A: Runtime Download (Failed ❌)] ➔ [Approach B: Commit Jar to Git (Invalid ❌)] ➔ [Approach C: Artifactory + Jib Layering (Success ✅)]
 ```
 
-### ❌ अप्रोच A: Pod में initContainer से डाउनलोड करना (फेल)
-* **क्या किया:** पॉड स्टार्ट होते समय `busybox` + `wget` से इंटरनेट से जार डाउनलोड करने की कोशिश की।
-* **फेल होने का कारण:** GKE Autopilot सुरक्षा कारणों से रनटाइम पर आउटबाउंड इंटरनेट एक्सेस ब्लॉक कर देता है (`Connection reset by peer`)।
+### ❌ Approach A: Runtime InitContainer Download (Failed)
+* **Implementation:** Used a Kubernetes `initContainer` (`busybox` + `wget`) to download `newrelic.jar` from the internet during pod initialization.
+* **Failure Cause:** **GKE Autopilot** blocks outbound public internet access for workloads by default due to strict network security policies, resulting in `Connection reset by peer` errors and crashing pods.
 
-### ❌ अप्रोच B: Git रिपॉजिटरी में 40MB की Jar कमिट करना (अमान्य)
-* **क्या किया:** जार फ़ाइल को लोकल कंप्यूटर पर डाउनलोड करके सीधे Git में कमिट कर दिया।
-* **अमान्य क्यों:** यह Enterprise मानकों के खिलाफ है। 40MB की बाइनरी फाइलों से Git रिपॉजिटरी भारी और स्लो हो जाती है।
+### ❌ Approach B: Storing 40MB `.jar` Binaries in Git (Invalid)
+* **Implementation:** Downloaded `newrelic.jar` locally and committed the binary directly to the Git repository under `src/main/jib/`.
+* **Invalidity Cause:** Violates enterprise DevOps standards. Storing large binary files in Git bloats repository size and degrades version control performance.
 
-### ✅ अप्रोच C: Artifactory + CI/CD Build Time Fetching (अंतिम और सफल)
-* **क्या किया:** 
-  1. `newrelic.jar` को हमारे स्व-होस्टेड **JFrog Artifactory (`generic-local`)** में स्टोर किया गया।
-  2. CI/CD बिल्ड के समय GitHub Actions Runner (जिसके पास इंटरनेट है) Artifactory से जार डाउनलोड करता है।
-  3. **Gradle Jib** बिल्ड टूल उस जार को Docker Image की लेयर में ही पैक (`/newrelic/newrelic.jar`) कर देता है।
-  4. जब Pod GKE में स्टार्ट होता है, तो एजेंट पहले से इमेज के अंदर मौजूद होता है — **रनटाइम पर 0 इंटरनेट की ज़रूरत!**
+### ✅ Approach C: Artifactory + Build-Time Fetching + Jib Layering (Final & Successful)
+* **Implementation:**
+  1. `newrelic.jar` is stored centrally in the self-hosted **JFrog Artifactory (`generic-local`)**.
+  2. During CI/CD build execution, the GitHub Actions runner (which has internet access) fetches the agent from Artifactory.
+  3. **Gradle Jib** bakes the agent directly into the container image filesystem layer at `/newrelic/newrelic.jar`.
+  4. When the Pod starts on GKE, the agent is already pre-baked inside the container — requiring **zero runtime downloads or internet access**.
 
 ---
 
-## 3. डेटा फ्लो आर्किटेक्चर (Data Flow Diagram)
+## 3. Data Flow & Telemetry Architecture
 
 ```mermaid
 flowchart TD
     subgraph GitRepo ["1. Git Repository"]
-        code[Pure Source Code - NO JARs]
+        code[Pure Source Code - NO JAR Binaries]
     end
 
     subgraph JFrogArtifactory ["2. JFrog Artifactory (my-jfrog-artifactory.duckdns.org)"]
-        generic_repo["generic-local\n(newrelic.jar)"]
-        docker_repo["docker-local\n(task/quote Docker Images)"]
+        generic_repo["generic-local Repository\n(newrelic.jar)"]
+        docker_repo["docker-local Repository\n(task & quote Docker Images)"]
     end
 
     subgraph GitHubActions ["3. CI/CD Pipeline (Build Time)"]
-        fetch["Download newrelic.jar from generic-local"]
+        fetch["Fetch newrelic.jar from generic-local"]
         jib["Gradle Jib Build\n(Bakes agent into /newrelic/newrelic.jar)"]
-        push["Push Docker Image to docker-local"]
+        push["Push Docker Images to docker-local"]
         fetch --> jib
         code --> jib
         jib --> push
@@ -65,7 +65,7 @@ flowchart TD
         pod["Java Service Pod"]
         jvm["JVM (-javaagent:/newrelic/newrelic.jar)"]
         secret["newrelic-secrets"]
-        kubelet -->|Runs Image| pod
+        kubelet -->|Runs Pre-baked Image| pod
         pod --> jvm
         secret --> jvm
     end
@@ -74,41 +74,41 @@ flowchart TD
         nr[APM Dashboard]
     end
 
-    generic_repo -->|HTTPS Download| fetch
-    push -->|HTTPS Push| docker_repo
+    generic_repo -->|HTTPS REST Download| fetch
+    push -->|HTTPS Docker Push| docker_repo
     docker_repo -->|HTTPS Image Pull via Secret| kubelet
-    jvm -- "HTTPS (Port 443) Direct Telemetry" --> nr
+    jvm -- "HTTPS (Port 443) Telemetry Ingest" --> nr
 ```
 
 ---
 
-## 4. Jib से Container में Jar कैसे पहुँची? (Deep Dive)
+## 4. How Files Map from Runner to Container via Jib
 
-Jib का एक बहुत खास नियम है:
+Gradle Jib enforces a specific directory convention:
 
-> **"`src/main/jib/` के अंदर रखी हर फ़ाइल और फोल्डर, container की `/` (root) डायरेक्टरी में exactly उसी स्ट्रक्चर में copy हो जाती है।"**
+> **"Any file or directory placed inside `src/main/jib/` is copied directly to the container root `/` filesystem."**
 
-### CI/CD बिल्ड टाइम पर फ़ाइल मैपिंग:
+### File Path Mapping:
 
 ```
-GitHub Actions Runner पर:             Container के अंदर:
-─────────────────────────────────    ──────────────────────
+GitHub Actions Runner Path:              Container Internal Path:
+─────────────────────────────────        ──────────────────────
 task-service/
   src/
     main/
-      jib/                    ──▶    /
-        newrelic/             ──▶      newrelic/
-          newrelic.jar        ──▶        newrelic.jar  ✅
+      jib/                        ──▶    /
+        newrelic/                 ──▶      newrelic/
+          newrelic.jar            ──▶        newrelic.jar  ✅
 ```
 
-### GitHub Actions (`deploy.yml`) में स्वचालित स्टेप:
+### GitHub Actions (`deploy.yml`) Fetch Step:
 ```yaml
 - name: Fetch New Relic Agent from Artifactory
   run: |
     mkdir -p task-service/src/main/jib/newrelic
     mkdir -p quote-service/src/main/jib/newrelic
     
-    # Artifactory generic-local से जार फ़ाइल डाउनलोड करें
+    # Download agent from Artifactory generic-local repository
     curl -s -u "${{ secrets.ARTIFACTORY_USER }}:${{ secrets.ARTIFACTORY_GENERIC_TOKEN }}" \
       -o task-service/src/main/jib/newrelic/newrelic.jar \
       "https://my-jfrog-artifactory.duckdns.org/artifactory/generic-local/newrelic/newrelic.jar"
@@ -118,20 +118,20 @@ task-service/
 
 ---
 
-## 5. JVM Agent कैसे activate होता है?
+## 5. JVM Agent Activation via Environment Variables
 
-Container स्टार्ट होने पर GKE Kubernetes Deployment Manifests द्वारा यह एन्वायरमेंट वैरिएबल पास करता है:
+When GKE starts the container, Kubernetes passes environment variables defined in Deployment manifests:
 
-### `JAVA_TOOL_OPTIONS` Kubernetes YAML में:
+### Kubernetes Manifest (`JAVA_TOOL_OPTIONS`):
 ```yaml
 env:
-  # 1. JVM को बताएं कि एजेंट इमेज में कहाँ है
+  # 1. Instruct the JVM where the agent jar is located inside the image
   - name: JAVA_TOOL_OPTIONS
     value: "-javaagent:/newrelic/newrelic.jar"
-  # 2. न्यू रेलिक डैशबोर्ड पर दिखने वाला नाम
+  # 2. Application name displayed in New Relic Dashboard
   - name: NEW_RELIC_APP_NAME
     value: "task-service"
-  # 3. न्यू रेलिक की सीक्रेट लाइसेंस की
+  # 3. New Relic License Key loaded from Kubernetes Secret
   - name: NEW_RELIC_LICENSE_KEY
     valueFrom:
       secretKeyRef:
@@ -140,12 +140,12 @@ env:
 ```
 
 > [!IMPORTANT]
-> `JAVA_TOOL_OPTIONS` एक मानक (Standard) Java environment variable है। कोई भी JVM इसे अपने आप पढ़ता है और इसमें दिए गए फ़्लैग्स को JVM स्टार्टअप पर लागू कर देता है। इसीलिए हमें अपने एप्लीकेशन कोड (`.java` फ़ाइलों) में कोई बदलाव नहीं करना पड़ा!
+> `JAVA_TOOL_OPTIONS` is a standard Java environment variable recognized automatically by any JVM. It applies JVM arguments on startup without requiring any changes to Java source code (`.java` files).
 
 ---
 
-## 6. मुख्य निष्कर्ष (Key Summary)
+## 6. Key Takeaways
 
-1. **Git बाइनरी मुक्त है:** Git रिपॉजिटरी में कोई भी `.jar` फ़ाइल स्टोर नहीं है।
-2. **Artifactory सेंट्रल सोर्स है:** एजेंट आर्टिफैक्ट्री `generic-local` में सुरक्षित है और बिल्ड टाइम पर पुल होता है।
-3. **GKE Autopilot सपोर्ट:** पॉड्स बिना किसी नेटवर्क एरर के तुरंत स्टार्ट होते हैं क्योंकि जार इमेज की लेयर का हिस्सा होती है।
+1. **Git Repository is Binary-Free:** No `.jar` binary files are committed to Git.
+2. **Centralized Dependency Management:** `newrelic.jar` is managed in Artifactory (`generic-local`) and pulled dynamically during CI/CD.
+3. **GKE Autopilot Compatibility:** Microservice pods start instantly without network errors because the monitoring agent is embedded directly in the container image layer.
