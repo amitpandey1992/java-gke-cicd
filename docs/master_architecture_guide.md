@@ -163,40 +163,35 @@ flowchart TD
 
 ---
 
-## 5. CI/CD Build Pipeline & Jib Agent Embedding Flow
+## 5. CI/CD Build Pipeline & PR-Based Workflow
 
-When a developer pushes code to `main`, GitHub Actions triggers the automated build workflow ([`.github/workflows/deploy.yml`](file:///C:/Users/AjitP/.gemini/antigravity/scratch/java-gke-cicd/.github/workflows/deploy.yml)).
+The deployment workflow ([`.github/workflows/deploy.yml`](file:///C:/Users/AjitP/.gemini/antigravity/scratch/java-gke-cicd/.github/workflows/deploy.yml)) follows an Enterprise **Pull-Request (PR) Driven CI/CD Pattern**:
+
+1. **Pull Request (PR Created / Updated):** Triggers **CI Steps** (Source Checkout, Java 17 Setup, and Gradle Unit Tests). Artifacts are NOT pushed to Artifactory and GKE is NOT updated.
+2. **Push / Merge to `main` Branch:** Triggers **CD Steps** (WIF Authentication, New Relic fetching, Jib OCI compilation, Artifactory Docker image push, and Helm GKE deployment).
 
 ```mermaid
 flowchart TD
-    subgraph Step1 ["Step 1: OIDC Authentication"]
-        git_push[Git Push to main] --> runner[GitHub Actions Runner]
-        runner -->|Keyless OIDC Exchange| wif[GCP Workload Identity]
-        wif -->|Short-Lived Access Token| runner
+    subgraph TriggerType ["Trigger Selection"]
+        pr_event["1. Pull Request Event (PR to main)"]
+        push_event["2. Push / Merge Event (Merge to main)"]
     end
 
-    subgraph Step2 ["Step 2: Agent Fetch & Cache"]
-        runner -->|Check generic-local| art_check{Agent in Artifactory?}
-        art_check -- Yes --> download_art[Download newrelic.jar from Artifactory]
-        art_check -- No --> download_nr[Download from New Relic Official]
-        download_nr --> upload_art[Upload to Artifactory generic-local]
-        upload_art --> download_art
-        download_art --> place_jib[Place in task-service & quote-service src/main/jib/newrelic/]
+    subgraph CIPipeline ["CI Pipeline (PR Validation)"]
+        pr_event --> checkout1[Checkout Code]
+        checkout1 --> java_setup1[Setup Java 17]
+        java_setup1 --> unit_tests[Run Microservice Unit Tests]
+        unit_tests --> pr_success["PR Green Checkmark ✅ (No Deploy)"]
     end
 
-    subgraph Step3 ["Step 3: Jib Compilation & Layering"]
-        place_jib --> jib_task[./gradlew jib task-service]
-        place_jib --> jib_quote[./gradlew jib quote-service]
-        runner --> docker_fe[docker build frontend]
-        
-        jib_task -->|Push OCI Image| art_docker[Push to docker-local Repository]
-        jib_quote -->|Push OCI Image| art_docker
-        docker_fe -->|Push Docker Image| art_docker
-    end
-
-    subgraph Step4 ["Step 4: Helm GKE Deployment"]
-        art_docker --> helm_deploy[helm upgrade --install java-app]
-        helm_deploy --> gke_apply[Apply Manifests & Secret Tokens to GKE]
+    subgraph CDPipeline ["CD Pipeline (Merge Deployment)"]
+        push_event --> checkout2[Checkout Code]
+        checkout2 --> wif[GCP WIF OIDC Auth]
+        wif --> fetch_nr[Fetch newrelic.jar from Artifactory generic-local]
+        fetch_nr --> jib_build[Gradle Jib Build & Layering]
+        jib_build --> art_push[Push Images to Artifactory docker-local]
+        art_push --> helm_deploy[Helm Upgrade Deploy to GKE]
+        helm_deploy --> live_update["Live Production Cluster Updated ✅"]
     end
 ```
 
