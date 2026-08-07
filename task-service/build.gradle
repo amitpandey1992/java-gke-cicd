@@ -27,7 +27,6 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
-// Jib Container Config
 jib {
     from {
         image = 'eclipse-temurin:17-jre-alpine'
@@ -41,4 +40,5 @@ jib {
         ports = ['8080']
         creationTime = 'USE_CURRENT_TIMESTAMP'
     }
+    allowInsecureRegistries = true
 }

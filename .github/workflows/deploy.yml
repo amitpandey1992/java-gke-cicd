@@ -83,10 +83,13 @@ jobs:
 
       # Step 6: Build & Push task-service to Artifactory via Gradle Jib
       - name: Build and Push Task Service to Artifactory with Jib
+        env:
+          GRADLE_OPTS: "-Djib.sendCredentialsOverHttp=true -Djib.allowInsecureRegistries=true"
         run: |
           cd task-service
           chmod +x gradlew || true
           ./gradlew jib \
+            -DsendCredentialsOverHttp=true \
             -Djib.allowInsecureRegistries=true \
             -Djib.sendCredentialsOverHttp=true \
             -Djib.to.image=${{ env.DOCKER_REPO }}/task-service:${{ github.sha }} \
@@ -96,10 +99,13 @@ jobs:
 
       # Step 7: Build & Push quote-service to Artifactory via Gradle Jib
       - name: Build and Push Quote Service to Artifactory with Jib
+        env:
+          GRADLE_OPTS: "-Djib.sendCredentialsOverHttp=true -Djib.allowInsecureRegistries=true"
         run: |
           cd quote-service
           chmod +x gradlew || true
           ./gradlew jib \
+            -DsendCredentialsOverHttp=true \
             -Djib.allowInsecureRegistries=true \
             -Djib.sendCredentialsOverHttp=true \
             -Djib.to.image=${{ env.DOCKER_REPO }}/quote-service:${{ github.sha }} \
