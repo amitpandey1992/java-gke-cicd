@@ -53,8 +53,13 @@ flowchart TD
         gradle_jib["Gradle Jib Compiler"]
     end
 
-    subgraph MonitoringCloud ["6. New Relic Cloud"]
-        nr_dashboard["New Relic EU APM Collector\n(HTTPS Port 443)"]
+    subgraph MonitoringCloud ["6. Observability & Telemetry Tier"]
+        nr_dashboard["New Relic EU APM Collector\n(HTTPS Port 443 - Bytecode Traces)"]
+        subgraph StandaloneVM ["Standalone Linux VM (137.23.52.82)"]
+            prom["Prometheus Container (Port 9090)\nhttp://137.23.52.82:9090"]
+            grafana["Grafana Container (Port 3000)\nhttp://137.23.52.82:3000"]
+            grafana -->|PromQL Queries| prom
+        end
     end
 
     browser -->|http://35.232.126.138| static_ip
@@ -71,6 +76,7 @@ flowchart TD
 
     task_pod -- "Direct APM Telemetry (JAVA_TOOL_OPTIONS)" --> nr_dashboard
     quote_pod -- "Direct APM Telemetry (JAVA_TOOL_OPTIONS)" --> nr_dashboard
+    prom -- "Scrape /actuator/prometheus (15s)" --> static_ip
 ```
 
 ---
@@ -83,6 +89,8 @@ flowchart TD
 | **GKE Autopilot** | Managed Kubernetes | Fully managed serverless Kubernetes cluster. Handles node auto-scaling, OS patching, and pod scheduling. |
 | **Google Workload Identity Federation (WIF)** | Cloud Security (OIDC) | Enables keyless authentication between GitHub Actions and GCP using short-lived OpenID Connect tokens. |
 | **JFrog Artifactory** | Artifact & Docker Registry | Self-hosted HTTPS registry (`my-jfrog-artifactory.duckdns.org`) storing `newrelic.jar` binaries, Docker images, and Helm charts. |
+| **Prometheus** | Time-Series Metrics Database | Standalone VM engine (`137.23.52.82:9090`) scraping Spring Boot Actuator metrics (`/actuator/prometheus`) over GKE Static IP every 15s. |
+| **Grafana** | Visualization & Alerting UI | Standalone VM dashboard (`137.23.52.82:3000`) querying Prometheus via PromQL to render JVM, CPU, RAM, and HTTP latency metrics. |
 | **Gradle** | Java Build System | Compiles Java 17 source code, manages project dependencies, and runs unit tests for microservices. |
 | **Jib (Google Container Tools)** | Container Compiler | Packages Java applications directly into OCI/Docker container images without requiring a Docker daemon or Dockerfiles. |
 | **Docker** | Containerization | Builds Nginx frontend images and manages local image layers. |
@@ -277,33 +285,33 @@ sequenceDiagram
 
 ---
 
-## 8. Observability & Telemetry Architecture (New Relic APM)
+## 8. Dual Observability & Telemetry Architecture
+
+The platform implements a **Dual Observability Pattern**:
+1. **New Relic APM (Bytecode Instrumentation & Tracing):** Captures micro-transaction traces, DB query latency, and unhandled runtime exceptions.
+2. **Prometheus & Grafana (Standalone VM Metrics):** Scrapes Spring Boot Micrometer endpoints (`/actuator/prometheus`) over the GKE Static IP (`35.232.126.138`) every 15s to render system health, JVM heap memory, and HTTP throughput dashboards at `http://137.23.52.82:3000/`.
 
 ```mermaid
 flowchart TD
-    subgraph PodRuntime ["Microservice Container Pod"]
-        jvm_start["JVM Startup command:\njava -javaagent:/newrelic/newrelic.jar -jar app.jar"]
-        agent["New Relic Agent Core\n(loaded into JVM memory)"]
-        app_code["Spring Boot Controllers & JPA Repositories"]
-        
-        jvm_start --> agent
-        app_code <-->|Bytecode Instrumentation| agent
+    subgraph GKEPod ["GKE Microservice Pod"]
+        jvm["JVM Runtime"]
+        nr_agent["New Relic Agent (/newrelic/newrelic.jar)"]
+        micrometer["Spring Boot Micrometer Actuator (/actuator/prometheus)"]
+        jvm --> nr_agent
+        jvm --> micrometer
     end
 
-    subgraph EnvVars ["Environment Variables Passed via Deployment YAML"]
-        env1["JAVA_TOOL_OPTIONS: -javaagent:/newrelic/newrelic.jar"]
-        env2["NEW_RELIC_APP_NAME: task-service / quote-service"]
-        env3["NEW_RELIC_LICENSE_KEY: Loaded from newrelic-secrets"]
+    subgraph NewRelicCloud ["1. New Relic Cloud (APM & Traces)"]
+        nr_collector["New Relic EU Collector Endpoint\n(Port 443)"]
+        nr_agent -- "Push Transaction Traces (JAVA_TOOL_OPTIONS)" --> nr_collector
     end
 
-    subgraph NRCloud ["New Relic EU Telemetry Cloud"]
-        collector["EU Collector Endpoint\n(https://collector.eu01.nr-data.net:443)"]
-        apm_dashboard["APM Transaction Dashboard"]
+    subgraph StandaloneVM ["2. Standalone Linux VM (137.23.52.82)"]
+        prom["Prometheus TSDB (Port 9090)\nhttp://137.23.52.82:9090"]
+        grafana["Grafana Dashboards (Port 3000)\nhttp://137.23.52.82:3000"]
+        prom -->|Pull Metrics Every 15s| micrometer
+        grafana -->|PromQL Queries| prom
     end
-
-    EnvVars --> jvm_start
-    agent -- "Asynchronous Batch Export (HTTPS Port 443)" --> collector
-    collector --> apm_dashboard
 ```
 
 ---
