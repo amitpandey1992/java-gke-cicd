@@ -12,6 +12,8 @@ spec:
       labels:
         app: quote-service
     spec:
+      imagePullSecrets:
+        - name: artifactory-docker-secret
       containers:
         - name: quote-service
           image: "{{ .Values.quoteService.image.repository }}:{{ .Values.quoteService.image.tag | default .Chart.AppVersion }}"

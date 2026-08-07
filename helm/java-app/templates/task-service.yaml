@@ -12,6 +12,8 @@ spec:
       labels:
         app: task-service
     spec:
+      imagePullSecrets:
+        - name: artifactory-docker-secret
       containers:
         - name: task-service
           image: "{{ .Values.taskService.image.repository }}:{{ .Values.taskService.image.tag | default .Chart.AppVersion }}"

@@ -1,24 +1,27 @@
 postgres:
   password: "secure-db-password-99"
 
+artifactory:
+  enabled: true
+  dockerConfigJson: ""
+
 frontend:
   replicaCount: 2
   image:
-    repository: "us-central1-docker.pkg.dev/project-616fef18-15b8-4d6c-8a2/java-app-repo/frontend"
+    repository: "137.23.52.82:8082/docker-local/frontend"
     tag: "latest"
 
 taskService:
   replicaCount: 2
   image:
-    repository: "us-central1-docker.pkg.dev/project-616fef18-15b8-4d6c-8a2/java-app-repo/task-service"
+    repository: "137.23.52.82:8082/docker-local/task-service"
     tag: "latest"
 
 quoteService:
   replicaCount: 1
   image:
-    repository: "us-central1-docker.pkg.dev/project-616fef18-15b8-4d6c-8a2/java-app-repo/quote-service"
+    repository: "137.23.52.82:8082/docker-local/quote-service"
     tag: "latest"
 
 newrelic:
   licenseKey: ""
-

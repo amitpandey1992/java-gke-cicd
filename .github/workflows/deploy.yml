@@ -1,4 +1,4 @@
-name: Build and Deploy Microservices to GKE
+name: Build and Deploy Microservices to GKE (via Artifactory)
 
 on:
   push:
@@ -11,7 +11,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-    # Required permissions for Workload Identity Federation (OIDC)
     permissions:
       contents: read
       id-token: write
@@ -19,15 +18,17 @@ jobs:
     env:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
       GCP_REGION: us-central1
-      ARTIFACT_REPO: java-app-repo
       GKE_CLUSTER: java-gke-cluster
+      ARTIFACTORY_HOST: "137.23.52.82:8082"
+      ARTIFACTORY_URL: "http://137.23.52.82:8082/artifactory"
+      DOCKER_REPO: "137.23.52.82:8082/docker-local"
 
     steps:
-      # Step 1: Checkout the repository code
+      # Step 1: Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Step 2: Set up JDK 17 for Spring Boot builds
+      # Step 2: Set up Java 17 for Spring Boot builds
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -35,7 +36,7 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      # Step 3: Authenticate to GCP using Workload Identity Federation (Keyless Auth)
+      # Step 3: Authenticate to GCP (OIDC) for GKE access
       - name: Authenticate to Google Cloud (OIDC)
         id: auth
         uses: google-github-actions/auth@v2
@@ -44,46 +45,68 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      # Step 4: Set up gcloud CLI
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-
-      # Step 5: Log in to Google Artifact Registry
-      - name: Log in to Google Artifact Registry
+      # Step 4: Fetch or Upload New Relic Agent to Artifactory generic-local
+      - name: Fetch New Relic Agent from Artifactory
         run: |
-          echo "${{ steps.auth.outputs.access_token }}" | docker login -u oauth2accesstoken --password-stdin ${{ env.GCP_REGION }}-docker.pkg.dev
+          mkdir -p task-service/src/main/jib/newrelic
+          mkdir -p quote-service/src/main/jib/newrelic
+          
+          # Check if newrelic.jar exists in Artifactory generic-local
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "${{ secrets.ARTIFACTORY_USER }}:${{ secrets.ARTIFACTORY_GENERIC_TOKEN }}" "${{ env.ARTIFACTORY_URL }}/generic-local/newrelic/newrelic.jar")
+          
+          if [ "$STATUS_CODE" -eq 200 ]; then
+            echo "newrelic.jar found in Artifactory generic-local (HTTP 200). Downloading..."
+            curl -s -u "${{ secrets.ARTIFACTORY_USER }}:${{ secrets.ARTIFACTORY_GENERIC_TOKEN }}" \
+              -o task-service/src/main/jib/newrelic/newrelic.jar \
+              "${{ env.ARTIFACTORY_URL }}/generic-local/newrelic/newrelic.jar"
+          else
+            echo "newrelic.jar NOT found in Artifactory (HTTP $STATUS_CODE). Downloading official agent and uploading to Artifactory generic-local..."
+            curl -s -L -o task-service/src/main/jib/newrelic/newrelic.jar https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic.jar
+            
+            # Upload to Artifactory generic-local for future builds
+            curl -s -u "${{ secrets.ARTIFACTORY_USER }}:${{ secrets.ARTIFACTORY_GENERIC_TOKEN }}" \
+              -T task-service/src/main/jib/newrelic/newrelic.jar \
+              "${{ env.ARTIFACTORY_URL }}/generic-local/newrelic/newrelic.jar"
+            echo "Uploaded newrelic.jar to Artifactory generic-local successfully."
+          fi
+          
+          cp task-service/src/main/jib/newrelic/newrelic.jar quote-service/src/main/jib/newrelic/newrelic.jar
+          ls -lh task-service/src/main/jib/newrelic/newrelic.jar
 
-      # Step 6: Build & Push task-service using Gradle Jib
-      - name: Build and Push Task Service with Jib
+      # Step 5: Log in to Artifactory Docker Registry
+      - name: Log in to Artifactory Docker Registry
+        run: |
+          echo "${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}" | docker login ${{ env.ARTIFACTORY_HOST }} -u ${{ secrets.ARTIFACTORY_USER }} --password-stdin
+
+      # Step 6: Build & Push task-service to Artifactory via Gradle Jib
+      - name: Build and Push Task Service to Artifactory with Jib
         run: |
           cd task-service
           chmod +x gradlew || true
-          IMAGE_URI="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/task-service"
           ./gradlew jib \
-            -Djib.to.image=${IMAGE_URI}:${{ github.sha }} \
+            -Djib.to.image=${{ env.DOCKER_REPO }}/task-service:${{ github.sha }} \
             -Djib.to.tags=latest \
-            -Djib.to.auth.username=oauth2accesstoken \
-            -Djib.to.auth.password=${{ steps.auth.outputs.access_token }}
+            -Djib.to.auth.username=${{ secrets.ARTIFACTORY_USER }} \
+            -Djib.to.auth.password=${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}
 
-      # Step 7: Build & Push quote-service using Gradle Jib
-      - name: Build and Push Quote Service with Jib
+      # Step 7: Build & Push quote-service to Artifactory via Gradle Jib
+      - name: Build and Push Quote Service to Artifactory with Jib
         run: |
           cd quote-service
           chmod +x gradlew || true
-          IMAGE_URI="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/quote-service"
           ./gradlew jib \
-            -Djib.to.image=${IMAGE_URI}:${{ github.sha }} \
+            -Djib.to.image=${{ env.DOCKER_REPO }}/quote-service:${{ github.sha }} \
             -Djib.to.tags=latest \
-            -Djib.to.auth.username=oauth2accesstoken \
-            -Djib.to.auth.password=${{ steps.auth.outputs.access_token }}
+            -Djib.to.auth.username=${{ secrets.ARTIFACTORY_USER }} \
+            -Djib.to.auth.password=${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}
 
-      # Step 8: Build & Push Nginx frontend using standard Docker Build
-      - name: Build and Push Frontend Docker Image
+      # Step 8: Build & Push Frontend Docker Image to Artifactory
+      - name: Build and Push Frontend Docker Image to Artifactory
         run: |
-          IMAGE_URI="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/frontend"
-          docker build -t ${IMAGE_URI}:${{ github.sha }} -t ${IMAGE_URI}:latest ./frontend
-          docker push ${IMAGE_URI}:${{ github.sha }}
-          docker push ${IMAGE_URI}:latest
+          FE_IMAGE="${{ env.DOCKER_REPO }}/frontend"
+          docker build -t ${FE_IMAGE}:${{ github.sha }} -t ${FE_IMAGE}:latest ./frontend
+          docker push ${FE_IMAGE}:${{ github.sha }}
+          docker push ${FE_IMAGE}:latest
 
       # Step 9: Set up Helm CLI
       - name: Set up Helm
@@ -96,31 +119,26 @@ jobs:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GCP_REGION }}
 
-      # Step 11: Clean up old StatefulSet (one-time migration to Deployment)
+      # Step 11: Clean up old Postgres StatefulSet
       - name: Cleanup old Postgres StatefulSet
         run: |
-          echo "Force deleting old postgres pods..."
           kubectl delete pods -l app=postgres --force --grace-period=0 --ignore-not-found=true
-          
-          echo "Deleting old StatefulSet without waiting..."
           kubectl delete statefulset postgres --ignore-not-found=true --wait=false
-          
-          echo "Removing finalizers from PVC to prevent deletion hang..."
           kubectl patch pvc postgres-pvc -p '{"metadata":{"finalizers":null}}' --type=merge --ignore-not-found=true || true
-          
-          echo "Deleting old PVC..."
           kubectl delete pvc postgres-pvc --ignore-not-found=true --wait=false
-          
-          echo "Cleanup triggered successfully. Fresh PVC/Deployment will be created by Helm."
 
-      # Step 12: Deploy application to GKE using Helm
-      - name: Deploy Helm Chart to GKE
+      # Step 12: Deploy application to GKE using Helm (with Artifactory imagePullSecrets)
+      - name: Deploy Helm Chart to GKE from Artifactory Images
         run: |
-          FE_REPO="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/frontend"
-          TASK_REPO="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/task-service"
-          QUOTE_REPO="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/quote-service"
+          DOCKER_CONFIG_JSON=$(echo -n "{\"auths\":{\"${{ env.ARTIFACTORY_HOST }}\":{\"username\":\"${{ secrets.ARTIFACTORY_USER }}\",\"password\":\"${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}\"}}}" | base64 -w 0)
+          
+          FE_REPO="${{ env.DOCKER_REPO }}/frontend"
+          TASK_REPO="${{ env.DOCKER_REPO }}/task-service"
+          QUOTE_REPO="${{ env.DOCKER_REPO }}/quote-service"
           
           helm upgrade --install java-app ./helm/java-app \
+            --set artifactory.enabled=true \
+            --set artifactory.dockerConfigJson="${DOCKER_CONFIG_JSON}" \
             --set frontend.image.repository=${FE_REPO} \
             --set frontend.image.tag=${{ github.sha }} \
             --set taskService.image.repository=${TASK_REPO} \
@@ -129,5 +147,3 @@ jobs:
             --set quoteService.image.tag=${{ github.sha }} \
             --set newrelic.licenseKey="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
             --wait --timeout 5m
-
-

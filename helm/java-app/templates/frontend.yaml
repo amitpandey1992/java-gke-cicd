@@ -12,6 +12,8 @@ spec:
       labels:
         app: frontend
     spec:
+      imagePullSecrets:
+        - name: artifactory-docker-secret
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | default .Chart.AppVersion }}"
