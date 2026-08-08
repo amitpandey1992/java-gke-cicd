@@ -11,7 +11,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: postgres-pvc
 spec:
-  storageClassName: standard-rwd
+  storageClassName: standard-rwo
   accessModes:
     - ReadWriteOnce
   resources:
