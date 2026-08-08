@@ -1,0 +1,6 @@
+# Rename this file to terraform.tfvars on your local machine.
+# Do NOT commit terraform.tfvars to Git (it is protected by .gitignore).
+
+billing_account_id = "YOUR_BILLING_ACCOUNT_ID"
+new_project_id     = "java-gke-demo-proj-2026"
+github_repo        = "your-username/java-gke-cicd"

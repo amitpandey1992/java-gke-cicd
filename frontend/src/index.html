@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise GKE Task Dashboard</title>
+    <!-- Google Fonts: Inter & Space Grotesk -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="app-container">
+        <!-- Header Section -->
+        <header class="app-header">
+            <div class="header-main">
+                <div class="logo-area">
+                    <i class="fa-solid fa-cubes logo-icon"></i>
+                    <div>
+                        <h1>CloudTask</h1>
+                        <p class="subtitle">Multi-Container Microservices on GKE</p>
+                    </div>
+                </div>
+                <!-- Quote Section -->
+                <div class="quote-card" id="quote-container">
+                    <i class="fa-solid fa-quote-left quote-icon"></i>
+                    <p class="quote-text" id="quote-text">Loading inspiration...</p>
+                    <button class="btn-refresh-quote" id="btn-refresh-quote" title="New Quote">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Form for creating task -->
+        <section class="form-section">
+            <form id="task-form" class="task-form-container">
+                <div class="form-inputs">
+                    <input type="text" id="task-title" placeholder="What needs to be done?" required autocomplete="off">
+                    <input type="text" id="task-desc" placeholder="Task description..." required autocomplete="off">
+                </div>
+                <button type="submit" class="btn-add-task">
+                    <i class="fa-solid fa-plus"></i> Add Task
+                </button>
+            </form>
+        </section>
+
+        <!-- Kanban Board Columns -->
+        <main class="kanban-board">
+            <!-- TO DO COLUMN -->
+            <div class="kanban-column" id="col-todo">
+                <div class="column-header">
+                    <span class="dot dot-todo"></span>
+                    <h2>To Do</h2>
+                    <span class="count-badge" id="count-todo">0</span>
+                </div>
+                <div class="column-cards" id="cards-todo"></div>
+            </div>
+
+            <!-- IN PROGRESS COLUMN -->
+            <div class="kanban-column" id="col-progress">
+                <div class="column-header">
+                    <span class="dot dot-progress"></span>
+                    <h2>In Progress</h2>
+                    <span class="count-badge" id="count-progress">0</span>
+                </div>
+                <div class="column-cards" id="cards-progress"></div>
+            </div>
+
+            <!-- DONE COLUMN -->
+            <div class="kanban-column" id="col-done">
+                <div class="column-header">
+                    <span class="dot dot-done"></span>
+                    <h2>Completed</h2>
+                    <span class="count-badge" id="count-done">0</span>
+                </div>
+                <div class="column-cards" id="cards-done"></div>
+            </div>
+        </main>
+
+        <!-- Status Bar -->
+        <footer class="app-footer">
+            <div class="status-indicator">
+                <span class="status-pulse"></span>
+                <span>Active Project: <strong class="glow-text">project-616fef18-15b8-4d6c-8a2</strong></span>
+            </div>
+            <div class="credits">
+                <span>Microservice Pods: <strong>3 Running</strong></span>
+            </div>
+        </footer>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

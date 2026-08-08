@@ -1,0 +1,4 @@
+# Rename this file to terraform.tfvars in your terraform/bootstrap directory.
+# Do NOT commit terraform.tfvars to Git (protected by .gitignore).
+
+base_project_id = "YOUR_EXISTING_GCP_PROJECT_ID"

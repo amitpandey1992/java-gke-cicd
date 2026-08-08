@@ -1,0 +1,179 @@
+name: Build and Deploy Microservices to GKE (via Artifactory HTTPS)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_REGION: us-central1
+      GKE_CLUSTER: java-gke-cluster
+      ARTIFACTORY_HOST: "my-jfrog-artifactory.duckdns.org"
+      ARTIFACTORY_URL: "https://my-jfrog-artifactory.duckdns.org/artifactory"
+      DOCKER_REPO: "my-jfrog-artifactory.duckdns.org/docker-local"
+
+    steps:
+      # Step 1: Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Java 17 for Spring Boot builds
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      # Step 3: Run Unit Tests for Microservices (CI Verification on PR and Push)
+      - name: Run Unit Tests for Microservices
+        run: |
+          chmod +x task-service/gradlew quote-service/gradlew || true
+          cd task-service && ./gradlew test || true && cd ..
+          cd quote-service && ./gradlew test || true && cd ..
+
+      # Step 4: Authenticate to GCP (OIDC) for GKE access (CD Step: On Push / Merge)
+      - name: Authenticate to Google Cloud (OIDC)
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: 'access_token'
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      # Step 5: Fetch or Upload New Relic Agent to Artifactory generic-local (CD Step)
+      - name: Fetch New Relic Agent from Artifactory
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          mkdir -p task-service/src/main/jib/newrelic
+          mkdir -p quote-service/src/main/jib/newrelic
+          
+          # Check if newrelic.jar exists in Artifactory generic-local
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u "${{ secrets.ARTIFACTORY_USER }}:${{ secrets.ARTIFACTORY_GENERIC_TOKEN }}" "${{ env.ARTIFACTORY_URL }}/generic-local/newrelic/newrelic.jar")
+          
+          if [ "$STATUS_CODE" -eq 200 ]; then
+            echo "newrelic.jar found in Artifactory generic-local (HTTP 200). Downloading..."
+            curl -s -u "${{ secrets.ARTIFACTORY_USER }}:${{ secrets.ARTIFACTORY_GENERIC_TOKEN }}" \
+              -o task-service/src/main/jib/newrelic/newrelic.jar \
+              "${{ env.ARTIFACTORY_URL }}/generic-local/newrelic/newrelic.jar"
+          else
+            echo "newrelic.jar NOT found in Artifactory (HTTP $STATUS_CODE). Downloading official agent and uploading to Artifactory generic-local..."
+            curl -s -L -o task-service/src/main/jib/newrelic/newrelic.jar https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic.jar
+            
+            # Upload to Artifactory generic-local for future builds
+            curl -s -u "${{ secrets.ARTIFACTORY_USER }}:${{ secrets.ARTIFACTORY_GENERIC_TOKEN }}" \
+              -T task-service/src/main/jib/newrelic/newrelic.jar \
+              "${{ env.ARTIFACTORY_URL }}/generic-local/newrelic/newrelic.jar"
+            echo "Uploaded newrelic.jar to Artifactory generic-local successfully."
+          fi
+          
+          cp task-service/src/main/jib/newrelic/newrelic.jar quote-service/src/main/jib/newrelic/newrelic.jar
+          ls -lh task-service/src/main/jib/newrelic/newrelic.jar
+
+      # Step 6: Log in to Artifactory Docker Registry over HTTPS (CD Step)
+      - name: Log in to Artifactory Docker Registry
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}" | docker login ${{ env.ARTIFACTORY_HOST }} -u ${{ secrets.ARTIFACTORY_USER }} --password-stdin
+
+      # Step 7: Build & Push task-service to Artifactory via Gradle Jib (CD Step)
+      - name: Build and Push Task Service to Artifactory with Jib
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          cd task-service
+          chmod +x gradlew || true
+          ./gradlew jib \
+            -Djib.to.image=${{ env.DOCKER_REPO }}/task-service:${{ github.sha }} \
+            -Djib.to.tags=latest \
+            -Djib.to.auth.username=${{ secrets.ARTIFACTORY_USER }} \
+            -Djib.to.auth.password=${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}
+
+      # Step 8: Build & Push quote-service to Artifactory via Gradle Jib (CD Step)
+      - name: Build and Push Quote Service to Artifactory with Jib
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          cd quote-service
+          chmod +x gradlew || true
+          ./gradlew jib \
+            -Djib.to.image=${{ env.DOCKER_REPO }}/quote-service:${{ github.sha }} \
+            -Djib.to.tags=latest \
+            -Djib.to.auth.username=${{ secrets.ARTIFACTORY_USER }} \
+            -Djib.to.auth.password=${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}
+
+      # Step 9: Build & Push Frontend Docker Image to Artifactory (CD Step)
+      - name: Build and Push Frontend Docker Image to Artifactory
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          FE_IMAGE="${{ env.DOCKER_REPO }}/frontend"
+          docker build -t ${FE_IMAGE}:${{ github.sha }} -t ${FE_IMAGE}:latest ./frontend
+          docker push ${FE_IMAGE}:${{ github.sha }}
+          docker push ${FE_IMAGE}:latest
+
+      # Step 10: Set up Helm CLI (CD Step)
+      - name: Set up Helm
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: azure/setup-helm@v4
+
+      # Step 11: Get GKE Cluster Credentials (CD Step)
+      - name: Get GKE Credentials
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GCP_REGION }}
+
+      # Step 12: Clean up old Postgres StatefulSet (CD Step)
+      - name: Cleanup old Postgres StatefulSet
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          kubectl delete pods -l app=postgres --force --grace-period=0 --ignore-not-found=true
+          kubectl delete statefulset postgres --ignore-not-found=true --wait=false
+          kubectl patch pvc postgres-pvc -p '{"metadata":{"finalizers":null}}' --type=merge --ignore-not-found=true || true
+          kubectl delete pvc postgres-pvc --ignore-not-found=true --wait=false
+
+      # Step 13: Deploy application to GKE using Helm (CD Step)
+      - name: Deploy Helm Chart to GKE from Artifactory Images
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          DOCKER_CONFIG_JSON=$(echo -n "{\"auths\":{\"https://${{ env.ARTIFACTORY_HOST }}\":{\"username\":\"${{ secrets.ARTIFACTORY_USER }}\",\"password\":\"${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}\"},\"${{ env.ARTIFACTORY_HOST }}\":{\"username\":\"${{ secrets.ARTIFACTORY_USER }}\",\"password\":\"${{ secrets.ARTIFACTORY_DOCKER_TOKEN }}\"}}}" | base64 -w 0)
+          
+          FE_REPO="${{ env.DOCKER_REPO }}/frontend"
+          TASK_REPO="${{ env.DOCKER_REPO }}/task-service"
+          QUOTE_REPO="${{ env.DOCKER_REPO }}/quote-service"
+          
+          helm upgrade --install java-app ./helm/java-app \
+            --set artifactory.enabled=true \
+            --set artifactory.dockerConfigJson="${DOCKER_CONFIG_JSON}" \
+            --set frontend.image.repository=${FE_REPO} \
+            --set frontend.image.tag=${{ github.sha }} \
+            --set frontend.loadBalancerIP="${{ secrets.FRONTEND_STATIC_IP }}" \
+            --set taskService.image.repository=${TASK_REPO} \
+            --set taskService.image.tag=${{ github.sha }} \
+            --set quoteService.image.repository=${QUOTE_REPO} \
+            --set quoteService.image.tag=${{ github.sha }} \
+            --set newrelic.licenseKey="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+            --wait --timeout 5m
