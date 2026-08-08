@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: cicd_analyzer
+      POSTGRES_USER: analyzer
+      POSTGRES_PASSWORD: changeme_in_production
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analyzer -d cicd_analyzer"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cicd-analyzer-network
+
+  jenkins:
+    image: jenkins/jenkins:lts
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    networks:
+      - cicd-analyzer-network
+
+volumes:
+  postgres_data:
+  jenkins_home:
+
+networks:
+  cicd-analyzer-network:
+    driver: bridge

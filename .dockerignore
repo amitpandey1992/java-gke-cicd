@@ -1,0 +1,9 @@
+.git
+.gitignore
+venv
+chroma_data
+*.pyc
+__pycache__
+.env
+project.tar.gz
+scripts/

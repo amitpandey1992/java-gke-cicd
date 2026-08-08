@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI/CD Failure Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="header">
+            <div class="header-left">
+                <h1 class="title">CI/CD Failure Intelligence</h1>
+                <p class="subtitle">AI-Powered Analysis & Self-Learning System</p>
+            </div>
+            <div class="header-right">
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">System Online</span>
+                </div>
+                <div class="last-refreshed">Last refreshed: <span id="refresh-time">Just now</span></div>
+            </div>
+        </header>
+
+        <section class="kpis skeleton-container">
+            <div class="kpi-card glass">
+                <div class="kpi-header">
+                    <span class="kpi-title">Total Failures</span>
+                    <span class="kpi-icon">🔴</span>
+                </div>
+                <div class="kpi-value" id="kpi-total">0</div>
+                <div class="kpi-subtitle">this month</div>
+            </div>
+            <div class="kpi-card glass">
+                <div class="kpi-header">
+                    <span class="kpi-title">AI Resolved</span>
+                    <span class="kpi-icon">🤖</span>
+                </div>
+                <div class="kpi-value">
+                    <span id="kpi-resolved">0</span>
+                    <span class="kpi-percent" id="kpi-resolved-percent">(0%)</span>
+                </div>
+                <div class="kpi-subtitle">automated fixes</div>
+            </div>
+            <div class="kpi-card glass">
+                <div class="kpi-header">
+                    <span class="kpi-title">Avg Resolution Time</span>
+                    <span class="kpi-icon">⚡</span>
+                </div>
+                <div class="kpi-value" id="kpi-time">0m</div>
+                <div class="kpi-subtitle">from failure to fix</div>
+            </div>
+            <div class="kpi-card glass">
+                <div class="kpi-header">
+                    <span class="kpi-title">Memory Hits</span>
+                    <span class="kpi-icon">🧠</span>
+                </div>
+                <div class="kpi-value" id="kpi-memory">0</div>
+                <div class="kpi-subtitle">skipped LLM queries</div>
+            </div>
+        </section>
+
+        <section class="charts-row">
+            <div class="chart-card glass">
+                <h2 class="chart-title">Failures Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="failuresOverTimeChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card glass">
+                <h2 class="chart-title">Failures by Platform</h2>
+                <div class="chart-container">
+                    <canvas id="platformChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="charts-row">
+            <div class="chart-card glass">
+                <h2 class="chart-title">Failure Categories</h2>
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card glass">
+                <h2 class="chart-title">Fix Success Rate</h2>
+                <div class="chart-container">
+                    <canvas id="fixSuccessChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="bottom-row">
+            <div class="table-card glass">
+                <h2 class="chart-title">Recent Failures</h2>
+                <div class="table-container">
+                    <table class="failures-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Platform</th>
+                                <th>Job Name</th>
+                                <th>Category</th>
+                                <th>Summary</th>
+                                <th>Confidence</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-failures-body">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="feedback-card glass">
+                <h2 class="chart-title">AI Fix Feedback</h2>
+                <div id="latest-analysis">
+                    <div class="analysis-job">Job: <span id="fb-job">API_Build_Tests</span></div>
+                    <div class="analysis-summary" id="fb-summary">Dependency mismatch in package.json causing build failure.</div>
+                    <div class="analysis-fix">
+                        <strong>Suggested Fix:</strong>
+                        <pre id="fb-fix">npm install axios@1.6.0 --save</pre>
+                    </div>
+                </div>
+                <div class="feedback-buttons">
+                    <button class="btn btn-success" onclick="dashboardApp.sendFeedback('latest', true)">✅ This Fixed It</button>
+                    <button class="btn btn-danger" onclick="dashboardApp.sendFeedback('latest', false)">❌ Didn't Help</button>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <div class="powered-by">Powered by Ollama + Llama 3</div>
+            <div class="footer-links">
+                <a href="/docs" class="api-link">API Docs</a>
+                <span class="version">v1.0.0</span>
+            </div>
+        </footer>
+    </div>
+    
+    <div id="toast" class="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="charts.js"></script>
+</body>
+</html>
