@@ -178,8 +178,13 @@ jobs:
             --set taskService.image.tag=${{ github.sha }} \
             --set quoteService.image.repository=${QUOTE_REPO} \
             --set quoteService.image.tag=${{ github.sha }} \
-            --set newrelic.licenseKey="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
-            --wait --timeout 5m
+            --set newrelic.licenseKey="${{ secrets.NEW_RELIC_LICENSE_KEY }}"
+          
+          echo "=== [CD Pipeline] Awaiting Rollout Readiness for Microservices ==="
+          kubectl rollout status deployment/postgres --timeout=180s || true
+          kubectl rollout status deployment/task-service --timeout=180s || true
+          kubectl rollout status deployment/quote-service --timeout=180s || true
+          kubectl rollout status deployment/frontend --timeout=180s || true
 
       # Step 14: Bootstrap & Sync ArgoCD GitOps Control Plane (Pull Pattern Automation)
       - name: Bootstrap ArgoCD Control Plane and Application CRD
