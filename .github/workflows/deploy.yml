@@ -177,3 +177,19 @@ jobs:
             --set quoteService.image.tag=${{ github.sha }} \
             --set newrelic.licenseKey="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
             --wait --timeout 5m
+
+      # Step 14: Bootstrap & Sync ArgoCD GitOps Control Plane (Pull Pattern Automation)
+      - name: Bootstrap ArgoCD Control Plane and Application CRD
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "=== [GitOps Pipeline] Provisioning ArgoCD Control Plane on GKE ==="
+          kubectl apply -f argocd/namespace.yaml
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+          
+          echo "=== [GitOps Pipeline] Waiting for ArgoCD Controller Readiness ==="
+          kubectl rollout status deployment/argocd-server -n argocd --timeout=300s || true
+          
+          echo "=== [GitOps Pipeline] Applying ArgoCD Application Manifest ==="
+          kubectl apply -f argocd/application.yaml
+          
+          echo "=== [GitOps Pipeline] ArgoCD GitOps successfully bootstrapped and synced with java-app-gitops namespace ==="
