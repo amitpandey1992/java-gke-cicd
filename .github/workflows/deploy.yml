@@ -146,14 +146,17 @@ jobs:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GCP_REGION }}
 
-      # Step 12: Clean up old Postgres StatefulSet (CD Step)
-      - name: Cleanup old Postgres StatefulSet
+      # Step 12: Remove stuck Terminating PVCs if any (CD Step)
+      - name: Force cleanup stuck Terminating PVCs
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
-          kubectl delete pods -l app=postgres --force --grace-period=0 --ignore-not-found=true
-          kubectl delete statefulset postgres --ignore-not-found=true --wait=false
-          kubectl patch pvc postgres-pvc -p '{"metadata":{"finalizers":null}}' --type=merge --ignore-not-found=true || true
-          kubectl delete pvc postgres-pvc --ignore-not-found=true --wait=false
+          echo "=== Checking for stuck Terminating PVCs ==="
+          if kubectl get pvc postgres-pvc 2>/dev/null | grep -q "Terminating"; then
+            echo "postgres-pvc is stuck in Terminating status. Stripping finalizers..."
+            kubectl patch pvc postgres-pvc -p '{"metadata":{"finalizers":null}}' --type=merge || true
+            kubectl delete pvc postgres-pvc --force --grace-period=0 --ignore-not-found=true || true
+            sleep 2
+          fi
 
       # Step 13: Deploy application to GKE using Helm (CD Step)
       - name: Deploy Helm Chart to GKE from Artifactory Images
