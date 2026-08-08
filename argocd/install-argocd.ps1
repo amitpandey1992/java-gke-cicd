@@ -13,8 +13,8 @@ gcloud container clusters get-credentials $ClusterName --region $Region --projec
 Write-Host "=== [2/5] Creating Namespaces ($ArgoNamespace, $TargetNamespace) ===" -ForegroundColor Green
 kubectl apply -f argocd/namespace.yaml
 
-Write-Host "=== [3/5] Deploying ArgoCD Engine to GKE Autopilot ===" -ForegroundColor Green
-kubectl apply -n $ArgoNamespace -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+Write-Host "=== [3/5] Deploying ArgoCD Engine to GKE Autopilot (Namespace Scoped) ===" -ForegroundColor Green
+kubectl apply --server-side --force-conflicts -n $ArgoNamespace -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/namespace-install.yaml
 
 Write-Host "=== [4/5] Awaiting ArgoCD Server Readiness ===" -ForegroundColor Green
 kubectl rollout status deployment/argocd-server -n $ArgoNamespace --timeout=300s

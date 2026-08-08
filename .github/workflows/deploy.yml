@@ -182,9 +182,9 @@ jobs:
       - name: Bootstrap ArgoCD Control Plane and Application CRD
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
-          echo "=== [GitOps Pipeline] Provisioning ArgoCD Control Plane on GKE ==="
+          echo "=== [GitOps Pipeline] Provisioning ArgoCD Control Plane on GKE (Namespace Scoped) ==="
           kubectl apply -f argocd/namespace.yaml
-          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+          kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/namespace-install.yaml
           
           echo "=== [GitOps Pipeline] Waiting for ArgoCD Controller Readiness ==="
           kubectl rollout status deployment/argocd-server -n argocd --timeout=300s || true
