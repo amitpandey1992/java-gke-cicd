@@ -1,0 +1,38 @@
+# ArgoCD GitOps Specific Overrides for java-app-gitops Namespace
+
+global:
+  environment: gitops
+  domain: java-gke-app.duckdns.org
+
+# Task Service Overrides
+taskService:
+  replicaCount: 2
+  env:
+    SPRING_PROFILES_ACTIVE: gitops
+    DEPLOYMENT_TYPE: argocd-pull-pattern
+
+# Quote Service Overrides
+quoteService:
+  replicaCount: 2
+  env:
+    SPRING_PROFILES_ACTIVE: gitops
+    DEPLOYMENT_TYPE: argocd-pull-pattern
+
+# Frontend Overrides
+frontend:
+  replicaCount: 2
+
+# Ingress Overrides for GitOps Isolation
+ingress:
+  enabled: true
+  className: gce
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    gitops.argocd.io/managed-by: "argocd"
+  hosts:
+    - host: java-gke-app.duckdns.org
+      paths:
+        - path: /gitops/*
+          pathType: ImplementationSpecific
+          serviceName: nginx-frontend
+          servicePort: 80

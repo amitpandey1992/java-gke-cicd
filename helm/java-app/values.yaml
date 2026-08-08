@@ -1,0 +1,101 @@
+# Baseline Configuration for java-app Helm Chart
+
+global:
+  environment: production
+  domain: java-gke-app.duckdns.org
+  staticIp: 35.232.126.138
+
+# Container Registry Settings (Self-Hosted Artifactory)
+image:
+  registry: my-jfrog-artifactory.duckdns.org/docker-local
+  pullPolicy: Always
+  imagePullSecrets:
+    - name: artifactory-cred
+
+# Task Service Microservice (Java 17 Spring Boot)
+taskService:
+  name: task-service
+  replicaCount: 2
+  image:
+    name: task-service
+    tag: 1.0.0
+  port: 8080
+  env:
+    SPRING_PROFILES_ACTIVE: prod
+    DB_HOST: postgres-service
+    DB_PORT: "5432"
+    DB_NAME: appdb
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+# Quote Service Microservice (Java 17 Spring Boot)
+quoteService:
+  name: quote-service
+  replicaCount: 2
+  image:
+    name: quote-service
+    tag: 1.0.0
+  port: 8081
+  env:
+    SPRING_PROFILES_ACTIVE: prod
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+# Frontend (Nginx)
+frontend:
+  name: nginx-frontend
+  replicaCount: 2
+  image:
+    name: nginx-frontend
+    tag: 1.0.0
+  port: 80
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+# PostgreSQL 15 Database
+postgresql:
+  enabled: true
+  name: postgres-service
+  image:
+    repository: postgres
+    tag: "15-alpine"
+  port: 5432
+  database: appdb
+  user: postgres
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: gce
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: "java-gke-static-ip"
+    networking.gke.io/managed-certificates: "java-app-ssl-cert"
+  hosts:
+    - host: java-gke-app.duckdns.org
+      paths:
+        - path: /*
+          pathType: ImplementationSpecific
+          serviceName: nginx-frontend
+          servicePort: 80

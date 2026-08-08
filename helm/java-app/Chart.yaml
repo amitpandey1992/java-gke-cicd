@@ -1,0 +1,6 @@
+apiVersion: v2
+name: java-app
+description: Helm chart for Java 17 Spring Boot Microservices (task-service, quote-service), Nginx Frontend, and PostgreSQL on GKE Autopilot
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

@@ -1,0 +1,164 @@
+---
+# Task Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.taskService.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.taskService.name }}
+    app.kubernetes.io/part-of: java-app
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.taskService.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.taskService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.taskService.name }}
+    spec:
+      {{- if .Values.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.image.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Values.taskService.name }}
+          image: "{{ .Values.image.registry }}/{{ .Values.taskService.image.name }}:{{ .Values.taskService.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.taskService.port }}
+              name: http
+          env:
+            {{- range $key, $val := .Values.taskService.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+            {{- end }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: postgres-password
+          resources:
+            {{- toYaml .Values.taskService.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: {{ .Values.taskService.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: {{ .Values.taskService.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+
+---
+# Quote Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.quoteService.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.quoteService.name }}
+    app.kubernetes.io/part-of: java-app
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.quoteService.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.quoteService.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.quoteService.name }}
+    spec:
+      {{- if .Values.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.image.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Values.quoteService.name }}
+          image: "{{ .Values.image.registry }}/{{ .Values.quoteService.image.name }}:{{ .Values.quoteService.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.quoteService.port }}
+              name: http
+          env:
+            {{- range $key, $val := .Values.quoteService.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.quoteService.resources | nindent 12 }}
+
+---
+# Nginx Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.frontend.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.frontend.name }}
+    app.kubernetes.io/part-of: java-app
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.frontend.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.frontend.name }}
+    spec:
+      containers:
+        - name: {{ .Values.frontend.name }}
+          image: "{{ .Values.image.registry }}/{{ .Values.frontend.image.name }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.frontend.port }}
+              name: http
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+
+{{- if .Values.postgresql.enabled }}
+---
+# PostgreSQL Database StatefulSet/Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.postgresql.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.postgresql.name }}
+    app.kubernetes.io/part-of: java-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.postgresql.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.postgresql.name }}
+    spec:
+      containers:
+        - name: postgresql
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.postgresql.port }}
+              name: postgresql
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgresql.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: postgres-password
+          resources:
+            {{- toYaml .Values.postgresql.resources | nindent 12 }}
+{{- end }}

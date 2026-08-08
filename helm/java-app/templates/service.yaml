@@ -1,0 +1,73 @@
+---
+# Task Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.taskService.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.taskService.name }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.taskService.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.taskService.name }}
+
+---
+# Quote Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.quoteService.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.quoteService.name }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.quoteService.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.quoteService.name }}
+
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.frontend.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.frontend.name }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.frontend.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.frontend.name }}
+
+{{- if .Values.postgresql.enabled }}
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.postgresql.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.postgresql.name }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.postgresql.port }}
+      targetPort: postgresql
+      protocol: TCP
+      name: postgresql
+  selector:
+    app: {{ .Values.postgresql.name }}
+{{- end }}
