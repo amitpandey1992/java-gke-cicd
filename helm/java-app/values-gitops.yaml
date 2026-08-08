@@ -4,9 +4,35 @@ global:
   environment: gitops
   domain: java-gke-app.duckdns.org
 
+artifactory:
+  enabled: false
+  dockerConfigJson: ""
+
+image:
+  registry: my-jfrog-artifactory.duckdns.org/docker-local
+  pullPolicy: Always
+  imagePullSecrets:
+    - name: artifactory-docker-secret
+
+postgres:
+  enabled: true
+  password: "postgres-secure-password-123!"
+
+postgresql:
+  enabled: true
+  name: postgres-service
+  password: "postgres-secure-password-123!"
+
+newrelic:
+  licenseKey: "dummy-key-replace-in-secret"
+
 # Task Service Overrides
 taskService:
   replicaCount: 2
+  image:
+    repository: my-jfrog-artifactory.duckdns.org/docker-local/task-service
+    name: task-service
+    tag: latest
   env:
     SPRING_PROFILES_ACTIVE: gitops
     DEPLOYMENT_TYPE: argocd-pull-pattern
@@ -14,6 +40,10 @@ taskService:
 # Quote Service Overrides
 quoteService:
   replicaCount: 2
+  image:
+    repository: my-jfrog-artifactory.duckdns.org/docker-local/quote-service
+    name: quote-service
+    tag: latest
   env:
     SPRING_PROFILES_ACTIVE: gitops
     DEPLOYMENT_TYPE: argocd-pull-pattern
@@ -21,6 +51,11 @@ quoteService:
 # Frontend Overrides
 frontend:
   replicaCount: 2
+  loadBalancerIP: ""
+  image:
+    repository: my-jfrog-artifactory.duckdns.org/docker-local/frontend
+    name: frontend
+    tag: latest
 
 # Ingress Overrides for GitOps Isolation
 ingress:
@@ -34,5 +69,5 @@ ingress:
       paths:
         - path: /gitops/*
           pathType: ImplementationSpecific
-          serviceName: nginx-frontend
+          serviceName: frontend
           servicePort: 80

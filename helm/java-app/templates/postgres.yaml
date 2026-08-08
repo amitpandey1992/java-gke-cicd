@@ -4,7 +4,7 @@ metadata:
   name: postgres-secrets
 type: Opaque
 stringData:
-  postgres-password: {{ .Values.postgres.password | default "postgres" | quote }}
+  postgres-password: {{ if .Values.postgres }}{{ .Values.postgres.password | default "postgres-secure-password-123!" | quote }}{{ else if .Values.postgresql }}{{ .Values.postgresql.password | default "postgres-secure-password-123!" | quote }}{{ else }}"postgres-secure-password-123!"{{ end }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
